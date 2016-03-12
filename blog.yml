@@ -1,0 +1,73 @@
+# Copyright (c) 2016 Timothy R. Chavez <timrchavez@gmail.com>
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+---
+- name: Use Ansible to provision a Ghost blog on Bluemix
+  hosts: localhost
+  connection: local
+  vars_files:
+    - "account.yml"
+  tasks:
+    - name: Auth to IBM Bluemix
+      bluemix_login: >
+        username="{{username}}"
+        password="{{password}}"
+        org="{{org}}"
+        space="{{space}}"
+    - name: Copy latest ghost image to private BlueMix registry
+      bluemix_image: >
+       name="registry.ng.bluemix.net/timrchavez/ghost"
+       source="ghost"
+       state=present
+      register: ghost_image
+    - debug: msg="{{ghost_image}}"
+    - name: Build nginx image
+      bluemix_image: >
+        name="registry.ng.bluemix.net/timrchavez/nginx"
+        source="images/nginx/"
+        state=build
+      register: nginx_image
+    - debug: msg="{{nginx_image}}"
+    - name: Create Ghost container
+      bluemix_container: >
+        name="blog"
+        ports=2368
+        image="{{ghost_image.result.id}}"
+        wait=true
+      register: ghost_container
+    - debug: msg="{{ghost_container}}"
+    - name: Delete Nginx container
+      bluemix_container: name="nginx" state=absent wait=yes
+    - name: Create Nginx container
+      bluemix_container: >
+        name="nginx"
+        ports=80
+        image="{{nginx_image.result.id}}"
+        links="blog:nginx"
+        wait=true
+      register: nginx_container
+    - debug: msg="{{nginx_container}}"
+    - name: Create public IP
+      bluemix_ip: state=present reuse=yes
+      register: nginx_public_ip
+    - debug: msg="{{nginx_public_ip}}"
+    - name: Assign public IP
+      bluemix_ip_action: >
+        action=bind
+        ip_address="{{nginx_public_ip.result.ip}}"
+        container="{{nginx_container.result.id}}"
