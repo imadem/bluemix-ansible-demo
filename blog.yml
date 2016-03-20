@@ -31,14 +31,14 @@
         space="{{space}}"
     - name: Copy latest ghost image to private BlueMix registry
       bluemix_image: >
-       name="registry.ng.bluemix.net/timrchavez/ghost"
+       name="registry.ng.bluemix.net/{{namespace}}/ghost"
        source="ghost"
        state=present
       register: ghost_image
     - debug: msg="{{ghost_image}}"
     - name: Build nginx image
       bluemix_image: >
-        name="registry.ng.bluemix.net/timrchavez/nginx"
+        name="registry.ng.bluemix.net/{{namespace}}/nginx"
         source="images/nginx/"
         state=build
       register: nginx_image
